@@ -594,11 +594,20 @@ DEBMC	fprintf(f, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n", n, li
 		  if (ps == NULL ) ps = ssvoid;
 	   
 	
-		printf("%s%*.*s", delim, -sirka, sirka, ps);
+		  switch (wrap_style)
+		  {
+		      case COL_WRAP:
+		      case COL_TRUNC:
+			printf("%s%*.*s", delim, -sirka, sirka, ps);
 //			repair_string(0, li[remap[idx]], wid[remap[idx]], seg, targetwidth);
-     
-	    } // for k
-	    printf("%s\n", delim_end);
+			break;
+		      default:
+		      case COL_NOWRAP:
+			printf("%s%*s", delim, -sirka, ps);
+			break;
+		  }
+	      } // for k
+	      printf("%s\n", delim_end);
 	} //for r
 //-----------------------------------------
 	if (verbose > 0) printf("==================================\n");
