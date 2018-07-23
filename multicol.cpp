@@ -3,6 +3,12 @@
 
 // g++ multicol_runner.cpp -g -std=c++11 -o mcol
 
+
+// under construction:
+// #PAGE_BEGIN and #PAGE_END define range, todo select page with page_counter
+//	implement filling spaces, column breaks
+
+
 #include<iostream>
 #include<fstream>
 #include<vector>
@@ -46,8 +52,8 @@ public:
       ~Multicol();
       
       void pr();
-      void pr_col(int nc);
-      void pr_col_new(int nc);
+      void pr_col_simple(int nc);		// preliminary version
+      void pr_col_new(int nc);			// with remap lines, wrapping etc
       int add( const char* &&s);
       int append( const char* &&s);
       int add_preallocated(char *ps);
@@ -116,18 +122,13 @@ void Multicol::prf( char fmt[], char s[])
 }
 
 // aktualne: ignoruje this->nc, bere argument nc
-void Multicol::pr_col(int nc)
+void Multicol::pr_col_simple(int nc)
 {
   
 	if (nc > 40) printf("MAX NUM of COLS is set to 40.\n");
 	if (nc <= 0 || nc > 40) return;
-//	if (nc <= 0 || nc > 10) return;
 DEBMC	fprintf(f, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n", n, li.size(), ncol, maxwidth);
 
-	
-	// TODO : udelat si schema v poli, pak tisk
-	// zatim privizorne aritmeika s indexy
-	// TODO test sirky
 
 //	int vyska = n / nc + 1;
 	int vyska = li.size() / nc + 1;		// docasne
@@ -190,9 +191,9 @@ DEBMC	fprintf(f, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n", n, li
 	    for (k = 0; k < nc; k++) {
 	       id = k * vyska + r;
 	       if (id>=li.size() || li[id] == NULL) 
-	         {ss = ssvoid; sswid=7; }			//assume that col has at least 7 chars // TODO : is sswid used?
+	         {ss = ssvoid; }			//assume that col has at least 7 chars // TODO : is sswid used? unbrace
 	       else
-	         {ss = li[id] + OFFS; sswid=wid[id]; }
+	         {ss = li[id] + OFFS;}
 //	       printf("%s%*s%*s", delim, sirka, ss, sirka-sswid, "");
 	       switch (wrap_style)
 	       {
@@ -474,11 +475,15 @@ void repairstring(int cmd, char *ps, int totalwid, int segment, int targetwidth)
       }
 }
 
+
 // 	return NULL if idx out of range
-// deactivated: routine MUST be followed by repair_string, we use %*.*s truncation
+// 	now deactivated: routine MUST be followed by repair_string, we use %*.*s truncation
 char* Multicol::fetch_segment(int idx, int targetwidth, std::vector<int> &remap)
 {
+      static char nullstr[] = "NULLSTR"; 
       if (idx >= remap.size() || idx < 0) return NULL;
+//      if (remap[idx] == -1) return NULL;
+      if (remap[idx] == -1) return nullstr;
       int seg = 0;
       while( idx-seg >= 0 && remap[idx-seg-1] == remap[idx] ) seg++;
       
@@ -489,6 +494,7 @@ char* Multicol::fetch_segment(int idx, int targetwidth, std::vector<int> &remap)
 int Multicol::remapline(int targetwidth, std::vector<int> &remap)
 {
 	int k;
+	int page_counter = 0;
 	
 	for (int idxr = 0; idxr < li.size(); idxr++)
 	{
@@ -500,6 +506,22 @@ int Multicol::remapline(int targetwidth, std::vector<int> &remap)
 			{
 				k = wid[idxr] / targetwidth;
 				while (k--) remap.push_back(idxr); 
+			}
+		}
+		if ( !trueline( li[idxr] + OFFS) )		// process commands
+		{
+			if (strcasecmp(li[idxr] + OFFS, "#NULL") == 0)
+			{
+				remap.push_back(-1);
+			}
+			if (strcasecmp(li[idxr] + OFFS, "#PAGE_BEGIN") == 0)
+			{
+				remap.clear();					// TODO tady bude bug, restartuje se wrapping segment,nevadi
+				page_counter++;
+			}
+			if (strcasecmp(li[idxr] + OFFS, "#PAGE_END") == 0)
+			{
+				break;	//ex for idx	//TODO reagovat na counter
 			}
 		}
 	}
@@ -592,7 +614,6 @@ DEBMC	fprintf(f, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n", n, li
 		  id = k * vyska + r;
 		  ps = fetch_segment(id, sirka, remap);
 		  if (ps == NULL ) ps = ssvoid;
-	   
 	
 		  switch (wrap_style)
 		  {
