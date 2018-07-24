@@ -40,6 +40,7 @@ int main(int argc, char ** argv)
 	printf("	 wrap=0		- long lines: 0=wrap, 1=run, 2=trunc\n");
 	printf("	 width=20	- set explicit width of columns, set also wrap=2\n");
 	printf("	 verbose=0	- additional info: 0=no, 1, 2\n");
+	printf("\n\nCommands in the text:\n\t\t#NULL, #PAGE_BEGIN, #PAGE_END - see source code.\n");
 
 	return 1;
   }
@@ -56,7 +57,6 @@ int main(int argc, char ** argv)
 
 // TERMINAL SIZE is now fixed, to improve
 
-	int val_int;
 	int ncol = 2;
 	arg_read(argc,argv,"ncol=%d", &ncol);
 	prnt.ncol = ncol;
@@ -73,10 +73,13 @@ int main(int argc, char ** argv)
 
 	arg_read(argc,argv,"width=%d", &prnt.explicitwidth);
 
+	arg_read(argc,argv,"merge=%s", &prnt.merge, 80);
+
 //=========  main loop  =================================
 	
 	if (prnt.verbose > 1)  __print_args();
 	
+//	prnt.load_file();
 	while( 1 )
 	{
 	    res_ptr = fgets(linebuff, MAXLINE, stdin);
@@ -84,7 +87,10 @@ int main(int argc, char ** argv)
 	    prnt.add(linebuff);
 	}
 	
-	prnt.pr_col_new(ncol);
+	if (prnt.merge[0]) 
+	    prnt.merger(ncol);
+	else
+	    prnt.pr_col_new(ncol);
 //	prnt.pr();
 	    
   return 0;
