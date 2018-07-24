@@ -43,6 +43,8 @@ int main(int argc, char ** argv)
 	printf("	 merge=filename	- display two files in paralel columns\n");
 	printf("	 termwidth=140	- width of the terminal\n");
 	printf("\n\nCommands in the text:\n\t\t#NULL, #PAGE_BEGIN, #PAGE_END - see source code.\n");
+	printf("\t\t#FILL c	- fills the full width of the line with char 'c'\n");
+	printf("\t\t            - beginnig of line "======" defaults to '#FILL =', if added by procedure 'add'.\n");
 
 	return 1;
   }

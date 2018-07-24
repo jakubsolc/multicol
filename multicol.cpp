@@ -10,6 +10,8 @@
 
 // //	implement filling chars:  "#FILL =",  automatacally "======etc" => fill==
 
+// TODO premistit nullstring atd do addendum
+
 #include<iostream>
 #include<fstream>
 #include<vector>
