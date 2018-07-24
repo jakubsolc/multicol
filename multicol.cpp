@@ -6,18 +6,21 @@
 
 // under construction:
 // #PAGE_BEGIN and #PAGE_END define range, todo select page with page_counter
-//	implement filling spaces, column breaks
+// column breaks
 
+// //	implement filling chars:  "#FILL =",  automatacally "======etc" => fill==
 
 #include<iostream>
 #include<fstream>
 #include<vector>
+#include<map>
 #include<cstring>
 
 #define X
 //#define CONCAT(A)		A ## A
 #define DEBMC			if(1) {;} else 
 #define DEBMCAPP		if(1) {;} else
+#define DEBMCREMAP		if(0) {;} else
 
 #define OFFS			(4)				// v tuhle chvili je OFFS zbytecna hracka
 //#define LN(A)			*(int*)(& A[0] )		// tuhle cestu jsem opustil,  lze smazat
@@ -27,6 +30,13 @@
 
 typedef enum {COL_RAW, COL_DENSE, COL_AIR, COL_WIDTH, COL_BARE, COL_WIDTH_VERBOSE}	COL_STYLE;
 typedef enum {COL_WRAP, COL_NOWRAP, COL_TRUNC}						WRAP_STYLE;
+typedef enum {MC_CMD_FILL, MC_CMD_NOP}							MC_CMDS;
+
+struct TSpec 
+{
+      MC_CMDS	cmd;
+      char	cha;
+};
 
 class Multicol
 {
@@ -47,7 +57,10 @@ private:
       int n;			// count of true lines without metalines #DELETED etc
       char *runningbuff;
       int runninglen;
+      std::vector<char*> addendum;	// 16 lines, prepared by fetch_segment immediately before print			NOT USED
+      std::vector<int>   addvar;	//           tmp variables							NOT USED
 
+      std::map<int,struct TSpec>  specials;
 public:      
       Multicol();
       ~Multicol();
@@ -68,10 +81,13 @@ private:
       int add_to_idx(int idx, const char* &&s);
       int remapline(int targetwidth, std::vector<int> &remap);
       char* fetch_segment(int idx, int targetwidth, std::vector<int> &remap);
+      void prepare_fill(int idx, int wid, char c);
+      char* process_special(int idx, int targetwidth, std::vector<int> &remap);
 };
 
 Multicol::Multicol() :
-	ncol(1), col_style(COL_AIR), wrap_style(COL_WRAP), explicitwidth(0), terminalwidth(160), verbose(1), maxwidth(0), n(0)
+	ncol(1), col_style(COL_AIR), wrap_style(COL_WRAP), explicitwidth(0), terminalwidth(160), verbose(1), maxwidth(0), n(0), 
+	addendum(16, NULL), addvar(16,0)
 {
 DEBMC	fprintf(file_out, "Konstruktor Multicol\n");
 DEBMC	fprintf(file_out, "===================\n");
@@ -236,8 +252,11 @@ DEBMC	fprintf(file_out, "Destruktor\n=======================================\n")
 //		if fail, -1
 // 	removes crlf at end of the string
 //	multiple line is added as one object containing \n
+//	checks for "=====", changes to "#fill ="
 int Multicol::add(const char* &&s)
 {
+	if (strncmp( s, "======", 6) == 0) return add("#FILL =");
+	    
 	char *ps;
 	size_t w = strlen(s);
 	if (w>254) {fprintf(file_out, "Too long string\n"); return -1;}
@@ -481,17 +500,52 @@ void repairstring(int cmd, char *ps, int totalwid, int segment, int targetwidth)
       }
 }
 
+// idx to store in addendum
+void Multicol::prepare_fill(int idx, int targetwidth, char c)
+{
+  if (addendum[idx] != NULL) {delete[] addendum[idx]; addendum[idx] = NULL;}
+  if (addendum[idx] == NULL) addendum[idx] = new char[targetwidth+1];
+  for (int i = 0; i < targetwidth; i++) addendum[idx][i] = c;
+  addendum[idx][targetwidth] = '\0';
+}
+//################################################################################################
+//################################################################################################
+//################################################################################################
+char* Multicol::process_special(int idx, int targetwidth, std::vector<int> &remap)
+{
+									// idx je index -> position at page
+									// remap[idx] je index -> text
+  
+      static char ni[] = "UNKNOWN CMD"; 				// to by slo zaradit mezi specials
+      static char nf[] = "CMD NOT FND"; 				// to by slo zaradit mezi specials
+      auto it = specials.find(remap[idx]);
+      if (it == specials.end()) return nf; 
+      switch(it->second.cmd)
+      {
+	case MC_CMD_FILL:
+	  prepare_fill(2, targetwidth, it->second.cha );		// step2: for efficiency replace [idx] with it->
+	  return addendum[2];
+	default:
+	  return ni;
+	  
+      }
+      return ni;
+}
+//################################################################################################
+//################################################################################################
+//################################################################################################
 
 // 	return NULL if idx out of range
 // 	now deactivated: routine MUST be followed by repair_string, we use %*.*s truncation
 char* Multicol::fetch_segment(int idx, int targetwidth, std::vector<int> &remap)
 {
-      static char nullstr[] = "NULLSTR"; 
+      static char nullstr[] = "NULLSTR"; 				// to by slo zaradit mezi specials
       if (idx >= (signed long)remap.size() || idx < 0) return NULL;
 //      if (remap[idx] == -1) return NULL;
-      if (remap[idx] == -1) return nullstr;
+      if (remap[idx] < 0) return process_special(idx, targetwidth, remap);
+
       int seg = 0;
-      while( idx-seg >= 0 && remap[idx-seg-1] == remap[idx] ) seg++;
+      while( idx-seg-1 >= 0 && remap[idx-seg-1] == remap[idx] ) seg++;
       
 //      repair_string(0, li[remap[idx]], wid[remap[idx]], seg, targetwidth);
       return li[ remap[idx] ] + OFFS + targetwidth * seg ;
@@ -529,9 +583,35 @@ int Multicol::remapline(int targetwidth, std::vector<int> &remap)
 			{
 				break;	//ex for idx	//TODO reagovat na counter
 			}
+			if (strncasecmp(li[idxr] + OFFS, "#FILL",5) == 0)	// tady je predevsim potreba rozhodnout o skutecnem poctu radek
+										// zpracovani muze byt pozdeji, kdyz nedojde ke ztrate informace
+										// kvuli poctu radku pushnu jeden zaporny idx, zbytek > specials
+			{
+										// muze byt zpracovano pozdeji, bude/li pointer na li[idxr] 
+				remap.push_back(-idxr);				// jeden radek
+
+				char cc = '-';					
+				if ( *(li[idxr]+OFFS + 5) == ' ') cc = *(li[idxr]+OFFS + 6);
+				if (cc == '\0') cc = '-';			// extrakce znaku
+				specials[-idxr].cmd = MC_CMD_FILL;
+				specials[-idxr].cha = cc;
+			}
+			
+			//	prikaz breakcolumn "penalty" - zde jde o to urcit skutecny pocet radku
 		}
 	}
 
+	
+DEBMCREMAP {
+	    printf("********** REMAP debug *********\n");
+	    printf("targetwidth=%3d:  remap.size()=%3ld\n", targetwidth, remap.size() );
+	    printf("********************************\n");
+	    for(size_t ii=0; ii < remap.size(); ii++) 
+	    {
+		printf("%3ld: %3d  [%s]\n", ii, remap[ii], fetch_segment(ii, targetwidth, remap) );
+	    }
+	}
+	
 	return remap.size();
 }
 
@@ -545,7 +625,7 @@ void Multicol::pr_col_new(int nc)
 
 DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n", n, li.size(), ncol, maxwidth);
 
-	if (verbose > 0) fprintf(file_out, "==================================\n");
+	if (verbose > 0) fprintf(file_out, "=============================\n");
 	if (li.size() == 0) fprintf(file_out, "  *  *  *\n");
 
 	int vyska;

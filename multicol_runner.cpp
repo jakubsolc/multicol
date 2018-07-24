@@ -95,7 +95,8 @@ int main(int argc, char ** argv)
 	    prnt.merger(ncol);
 	else
 	    prnt.pr_col_new(ncol);
-//	prnt.pr();
+
+	if (arg_check(argc,argv,"deb")) prnt.pr(1);
 	    
   return 0;
 }
