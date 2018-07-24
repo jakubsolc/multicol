@@ -40,6 +40,8 @@ int main(int argc, char ** argv)
 	printf("	 wrap=0		- long lines: 0=wrap, 1=run, 2=trunc\n");
 	printf("	 width=20	- set explicit width of columns, set also wrap=2\n");
 	printf("	 verbose=0	- additional info: 0=no, 1, 2\n");
+	printf("	 merge=filename	- display two files in paralel columns\n");
+	printf("	 termwidth=140	- width of the terminal\n");
 	printf("\n\nCommands in the text:\n\t\t#NULL, #PAGE_BEGIN, #PAGE_END - see source code.\n");
 
 	return 1;
@@ -75,6 +77,8 @@ int main(int argc, char ** argv)
 
 	arg_read(argc,argv,"merge=%s", &prnt.merge, 80);
 
+	arg_read(argc,argv,"termwidth=%d", &prnt.terminalwidth);
+	
 //=========  main loop  =================================
 	
 	if (prnt.verbose > 1)  __print_args();

@@ -14,7 +14,6 @@
 #include<vector>
 #include<cstring>
 
-#define TERMINALWIDTH		(140)
 #define X
 //#define CONCAT(A)		A ## A
 #define DEBMC			if(1) {;} else 
@@ -38,6 +37,7 @@ public:
       COL_STYLE col_style;
       WRAP_STYLE wrap_style;
       int explicitwidth;
+      int terminalwidth;
       int verbose;
       char merge[80];
 private:
@@ -52,7 +52,7 @@ public:
       Multicol();
       ~Multicol();
       
-      void pr();
+      void pr(int linenumbers=0);
       void pr_col_simple(int nc);		// preliminary version
       void pr_col_new(int nc);			// with remap lines, wrapping etc
       int add( const char* &&s);
@@ -71,12 +71,12 @@ private:
 };
 
 Multicol::Multicol() :
-	ncol(1), col_style(COL_AIR), wrap_style(COL_WRAP), explicitwidth(0), verbose(1), maxwidth(0), n(0)
+	ncol(1), col_style(COL_AIR), wrap_style(COL_WRAP), explicitwidth(0), terminalwidth(160), verbose(1), maxwidth(0), n(0)
 {
 DEBMC	fprintf(file_out, "Konstruktor Multicol\n");
 DEBMC	fprintf(file_out, "===================\n");
 	
-	runningbuff = new char[TERMINALWIDTH+1+OFFS];
+	runningbuff = new char[terminalwidth+1+OFFS];
 	runninglen = 0;
 
 	merge[0] = '\0';
@@ -93,17 +93,18 @@ DEBMC	fprintf(file_out, "=======================================\n");
       
 }
 
-void Multicol::pr()
+void Multicol::pr(int linenumbers)
 {
 	fprintf(file_out, "=======================================\n");
-	fprintf(file_out, "DEBUG:  n=%d  vecsize=%ld widsize=%ld ncol=%d  maxwidth=%d\n", n, li.size(), wid.size(), ncol, maxwidth);
+DEBMC	fprintf(file_out, "DEBUG:  n=%d  vecsize=%ld widsize=%ld ncol=%d  maxwidth=%d\n", n, li.size(), wid.size(), ncol, maxwidth);
 	
-	fprintf(file_out, "Rows: %ld\n", li.size());
-	fprintf(file_out, "==================================\n");
+DEBMC	fprintf(file_out, "Rows: %ld\n", li.size());
+DEBMC	fprintf(file_out, "==================================\n");
 	if (li.size()==0) fprintf(file_out, "  *  *  *\n");
 	for (size_t r=0; r < li.size(); r++)
 	{
-		fprintf(file_out, "%4ld:%4d | %s", r, wid[r], li[r]+OFFS);
+		if (linenumbers) fprintf(file_out, "%4ld:%4d | %s", r, wid[r], li[r]+OFFS);
+		else  fprintf(file_out, "%s", li[r]+OFFS);
 		fprintf(file_out, "\n");
 	}
 	fprintf(file_out, "==================================\n");
@@ -144,17 +145,17 @@ DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n"
 	const char *delim, *delim_end;
 	switch (col_style) {
 	  case COL_RAW:
-	    sirka = (TERMINALWIDTH) / nc;		// pocitam nadoraz
+	    sirka = (terminalwidth) / nc;		// pocitam nadoraz
 	    delim = delimtable[0];
 	    delim_end = delimtablx[0];			// TODO lze indexovat najednou
 	    break;
 	  case COL_DENSE:
-	    sirka = (TERMINALWIDTH-nc-1) / nc;		// pocitam vcetne '|'
+	    sirka = (terminalwidth-nc-1) / nc;		// pocitam vcetne '|'
 	    delim = delimtable[1];
 	    delim_end = delimtablx[1];
 	    break;
 	  case COL_AIR:
-	    sirka = (TERMINALWIDTH-3*nc-1) / nc;	// pocitam vcetne ' | '
+	    sirka = (terminalwidth-3*nc-1) / nc;	// pocitam vcetne ' | '
 	    delim = delimtable[2];
 	    delim_end = delimtablx[2];
 	    break;
@@ -171,7 +172,7 @@ DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n"
 	    verbose = 1;
 	    break;
 	  case COL_BARE:				// zatim identicke jako RAW
-	    sirka = (TERMINALWIDTH) / nc;		// pocitam nadoraz
+	    sirka = (terminalwidth) / nc;		// pocitam nadoraz
 	    delim = delimtable[0];
 	    delim_end = delimtablx[0];			// TODO lze indexovat najednou
 	    break;
@@ -273,15 +274,15 @@ DEBMCAPP	fprintf(file_out, "APP: runlen=%d, runn=[%s], s=[%s]\n",  runninglen, (
 	// check output buffer
 	if (runningbuff == NULL) 
 	{
-	  runningbuff = new char[TERMINALWIDTH+1+OFFS];			// BACHA na ty zavorky !!!
+	  runningbuff = new char[terminalwidth+1+OFFS];			// BACHA na ty zavorky !!!
 	  runninglen = 0;
 	}
 	
 	int num_of_chars_to_write;
 	int wrap;
-	if (TERMINALWIDTH - runninglen -1 < len)     // reserve [0], at the end '$' '\0'
+	if (terminalwidth - runninglen -1 < len)     // reserve [0], at the end '$' '\0'
 	{
-	  num_of_chars_to_write = TERMINALWIDTH - runninglen -1;	//-1 because of wrappingchar 
+	  num_of_chars_to_write = terminalwidth - runninglen -1;	//-1 because of wrappingchar 
 	  wrap = 1;
 	  fprintf(file_out, "Line is too long: len=%d,  wrapping, writing:%d.\n", len, num_of_chars_to_write);
 	} else {
@@ -295,7 +296,7 @@ DEBMCAPP	fprintf(file_out, "AP2: towrite=%d, newlen=%d, wrap=%d\n", num_of_chars
 	if (*p_end == '\n' || wrap == 1)
 	{
 	  // if the line is long, use buff as new line
-	  if (newlength > TERMINALWIDTH/2)
+	  if (newlength > terminalwidth/2)
 	  {
 DEBMCAPP	    fprintf(file_out, "Enter Case #1: \n");
 	    strncpy( runningbuff + OFFS + runninglen, p_start, num_of_chars_to_write );
@@ -558,17 +559,17 @@ DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n"
 
 	switch (col_style) {
 	  case COL_RAW:
-	    sirka = (TERMINALWIDTH) / nc;		// pocitam nadoraz
+	    sirka = (terminalwidth) / nc;		// pocitam nadoraz
 	    delim = delimtable[0];
 	    delim_end = delimtablx[0];			// TODO lze indexovat najednou
 	    break;
 	  case COL_DENSE:
-	    sirka = (TERMINALWIDTH-nc-1) / nc;		// pocitam vcetne '|'
+	    sirka = (terminalwidth-nc-1) / nc;		// pocitam vcetne '|'
 	    delim = delimtable[1];
 	    delim_end = delimtablx[1];
 	    break;
 	  case COL_AIR:
-	    sirka = (TERMINALWIDTH-3*nc-1) / nc;	// pocitam vcetne ' | '
+	    sirka = (terminalwidth-3*nc-1) / nc;	// pocitam vcetne ' | '
 	    delim = delimtable[2];
 	    delim_end = delimtablx[2];
 	    break;
@@ -585,7 +586,7 @@ DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n"
 	    verbose = 1;
 	    break;
 	  case COL_BARE:				// zatim identicke jako RAW
-	    sirka = (TERMINALWIDTH) / nc;		// pocitam nadoraz
+	    sirka = (terminalwidth) / nc;		// pocitam nadoraz
 	    delim = delimtable[0];
 	    delim_end = delimtablx[0];			// TODO lze indexovat najednou
 	    break;
@@ -681,17 +682,17 @@ DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n"
 	
 	switch (col_style) {
 	  case COL_RAW:
-	    sirka = (TERMINALWIDTH) / true_nc;		// pocitam nadoraz
+	    sirka = (terminalwidth) / true_nc;		// pocitam nadoraz
 	    delim = delimtable[0];
 	    delim_end = delimtablx[0];			// TODO lze indexovat najednou
 	    break;
 	  case COL_DENSE:
-	    sirka = (TERMINALWIDTH-true_nc-1) / true_nc;	// pocitam vcetne '|'
+	    sirka = (terminalwidth-true_nc-1) / true_nc;	// pocitam vcetne '|'
 	    delim = delimtable[1];
 	    delim_end = delimtablx[1];
 	    break;
 	  case COL_AIR:
-	    sirka = (TERMINALWIDTH-3*true_nc-1) / true_nc;	// pocitam vcetne ' | '
+	    sirka = (terminalwidth-3*true_nc-1) / true_nc;	// pocitam vcetne ' | '
 	    delim = delimtable[2];
 	    delim_end = delimtablx[2];
 	    break;
@@ -708,7 +709,7 @@ DEBMC	fprintf(file_out, "DEBUG: PRCOL n=%d  vecsize=%ld  ncol=%d  maxwidth=%d\n"
 	    verbose = 1;
 	    break;
 	  case COL_BARE:				// zatim identicke jako RAW
-	    sirka = (TERMINALWIDTH) / true_nc;		// pocitam nadoraz
+	    sirka = (terminalwidth) / true_nc;		// pocitam nadoraz
 	    delim = delimtable[0];
 	    delim_end = delimtablx[0];			// TODO lze indexovat najednou
 	    break;
